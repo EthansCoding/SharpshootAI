@@ -6,28 +6,38 @@ class aim_trainer:
 
     def __init__(self, render_mode=None):
         self.render_mode = render_mode
-        
-        self.app = Ursina(launch_ui=False)
+
+        window_type = 'onscreen' if render_mode == "human" else 'none'
+        self.app = Ursina(
+            launch_ui=False,
+            window_type=window_type,
+            development_mode=False
+        )
 
         self.input_handler = Entity(
             input=self.handle_input,
             ignore_paused=True
         )
 
-        if render_mode != "human":
-            window.visible = False
+        if self.render_mode == "human":
+            self.ground = Entity(model='plane', collider='box', scale=100, texture='grass', texture_scale=(4, 4))
+            self.sky = Sky()
         
-        self.ground = Entity(model='plane', collider='box', scale=100, texture='grass', texture_scale=(4, 4))
-        self.sky = Sky()
-    
-        self.Enemies = []
+            self.Enemies = []
 
-        self.Enemies.append(Entity(collider = 'sphere',model='sphere', color=color.blue, position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10))))
-        self.Enemies[0].health = 3
-    
-        self.player = FirstPersonController()
-    
-        self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
+            self.Enemies.append(Entity(collider = 'sphere',model='sphere', color=color.blue, position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10))))
+            self.Enemies[0].health = 3
+        
+            self.player = FirstPersonController()
+        
+            self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
+        else:
+            self.Enemies = []
+            self.Enemies.append(Entity(collider = 'sphere', position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10))))
+            self.Enemies[0].health = 3
+            
+            self.player = Entity()
+            self.player.camera_pivot = Entity(parent=self.player, y=2)
 
     def step(self):
         self.app.step()
@@ -35,12 +45,12 @@ class aim_trainer:
     def start(self):
         self.app.run()
 
-    def reset(self):
+    def reset(self, render_mode=None):
         self.__init__(self.render_mode)
 
     def handle_input(self, key="none"):
         if key == 'escape':
-            self.app.quit()
+            application.quit()
 
         if key == 'right arrow':
             self.player.camera_pivot.rotation_y += 1

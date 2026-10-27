@@ -13,16 +13,16 @@ class AimTrainerEnv(gym.Env):
         high = np.array([1, 1, 1, 1], dtype=np.float32)
         self.observation_space = spaces.Box(low=low, high=high)
 
-        self.aim_trainer_instance = aim_trainer()
+        self.aim_trainer_instance = aim_trainer(render_mode=render_mode)
 
-    def reset(self):
-        self.aim_trainer_instance.reset()
+    def reset(self, seed=None, render_mode=None, options=None):
+        self.aim_trainer_instance.reset(render_mode=render_mode)
 
         return np.zeros(4, dtype=np.float32), {}
 
     def step(self, action):
         beforeXY, beforeZX = self.getAngleToEnemy()
-        beforeDMG = self.aim_trainer_instance.enemies[0].health
+        beforeDMG = self.aim_trainer_instance.Enemies[0].health
 
         if action == 1:
             self.aim_trainer_instance.handle_input('left arrow')
@@ -39,7 +39,7 @@ class AimTrainerEnv(gym.Env):
         thetaXY, thetaZX = self.getAngleToEnemy()
 
         reward = (abs(beforeXY) - abs(thetaXY)) + (abs(beforeZX) - abs(thetaZX)) * .05
-        if beforeDMG != self.aim_trainer_instance.enemies[0].health:
+        if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             reward += 3
 
         observation = np.array([np.cos(thetaXY), np.sin(thetaXY), np.cos(thetaZX), np.sin(thetaZX)], dtype=np.float32)
@@ -51,7 +51,7 @@ class AimTrainerEnv(gym.Env):
         return (observation, reward, terminated, truncated, info)
 
     def getAngleToEnemy(self):
-        position = self.aim_trainer_instance.enemies[0].world_position
+        position = self.aim_trainer_instance.Enemies[0].world_position
         ownPosition = self.aim_trainer_instance.player.camera_pivot.world_position
 
         hypotenuseXY = ((position.x - ownPosition.x)**2 + (position.y - ownPosition.y)**2) ** .5
