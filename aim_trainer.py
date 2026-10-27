@@ -5,6 +5,8 @@ from ursina.prefabs.first_person_controller import FirstPersonController
 class aim_trainer:
 
     def __init__(self, render_mode=None):
+        self.render_mode = render_mode
+        
         self.app = Ursina(launch_ui=False)
 
         self.input_handler = Entity(
@@ -32,6 +34,9 @@ class aim_trainer:
 
     def start(self):
         self.app.run()
+
+    def reset(self):
+        self.__init__(self.render_mode)
 
     def handle_input(self, key="none"):
         if key == 'escape':
@@ -76,6 +81,3 @@ class aim_trainer:
         new_enemy = Entity(collider='sphere', model='sphere', color=color.blue, position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10)))
         new_enemy.health = 3
         self.Enemies.append(new_enemy)
-
-aim_trainer_instance = aim_trainer("human")
-aim_trainer_instance.start()
