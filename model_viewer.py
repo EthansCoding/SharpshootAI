@@ -10,4 +10,5 @@ for _step in range(1000):
         obs,
         deterministic=True
     )
+    print(f"Obs: {obs}")
     obs, reward, terminated, truncated = model.env.step(action)

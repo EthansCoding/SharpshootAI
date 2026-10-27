@@ -24,21 +24,21 @@ class AimTrainerEnv(gym.Env):
         beforeXY, beforeZX = self.getAngleToEnemy()
         beforeDMG = self.aim_trainer_instance.Enemies[0].health
 
-        if action == 1:
+        if action == 0:
             self.aim_trainer_instance.handle_input('left arrow')
-        elif action == 2:
+        elif action == 1:
             self.aim_trainer_instance.handle_input('right arrow')
-        elif action == 3:
+        elif action == 2:
             self.aim_trainer_instance.handle_input('up arrow')
-        elif action == 4:
+        elif action == 3:
             self.aim_trainer_instance.handle_input('down arrow')
-        elif action == 5:
+        elif action == 4:
             self.aim_trainer_instance.handle_input('e')
         self.aim_trainer_instance.step()
 
         thetaXY, thetaZX = self.getAngleToEnemy()
 
-        reward = (abs(beforeXY) - abs(thetaXY)) + (abs(beforeZX) - abs(thetaZX)) * .05
+        reward = (abs(beforeXY) - abs(thetaXY)) * .2 + (abs(beforeZX) - abs(thetaZX)) * .2
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             reward += 3
 
@@ -51,16 +51,23 @@ class AimTrainerEnv(gym.Env):
         return (observation, reward, terminated, truncated, info)
 
     def getAngleToEnemy(self):
-        position = self.aim_trainer_instance.Enemies[0].world_position
-        ownPosition = self.aim_trainer_instance.player.camera_pivot.world_position
+        enemy = self.aim_trainer_instance.Enemies[0].world_position
+        pivot = self.aim_trainer_instance.player.camera_pivot 
+        offset = enemy - pivot.world_position
 
-        hypotenuseXY = ((position.x - ownPosition.x)**2 + (position.y - ownPosition.y)**2) ** .5
-        thetaXY = np.arcsin((position.y - ownPosition.y) / hypotenuseXY)
+        target_yaw = np.arctan2(offset.x, offset.z)
+        target_pitch = -np.arctan2(
+            offset.y, 
+            np.hypot(offset.x, offset.z)
+        )
 
-        hypotenuseZX = ((position.z - ownPosition.z)**2 + (position.x - ownPosition.x)**2) ** .5
-        thetaZX = np.arcsin((position.z - ownPosition.z) / hypotenuseZX)
+        current_yaw = np.deg2rad(pivot.rotation_y)
+        current_pitch = np.deg2rad(pivot.rotation_x)
 
-        return thetaXY, thetaZX
+        yaw_error = (target_yaw - current_yaw + np.pi) % (2 * np.pi) - np.pi
+        pitch_error = (target_pitch - current_pitch + np.pi) % (2 * np.pi) - np.pi
+
+        return yaw_error, pitch_error
 
     def close(self):
         self.aim_trainer_instance.close()
