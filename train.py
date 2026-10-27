@@ -10,7 +10,10 @@ env = AimTrainerEnv(render_mode=None)
 
 model = PPO("MlpPolicy", env, verbose=1)
 
-model.learn(total_timesteps = 100000)
+model.learn(
+    total_timesteps = 100_000,
+    progress_bar = True
+)
 model.save(models_dir / "ppo_aim_trainer")
 
 env.close()

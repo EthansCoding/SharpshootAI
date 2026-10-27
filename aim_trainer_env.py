@@ -63,4 +63,4 @@ class AimTrainerEnv(gym.Env):
         return thetaXY, thetaZX
 
     def close(self):
-        self.aim_trainer_instance.app.quit()
+        self.aim_trainer_instance.close()

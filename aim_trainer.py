@@ -35,7 +35,7 @@ class aim_trainer:
             self.Enemies = []
             self.Enemies.append(Entity(collider = 'sphere', position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10))))
             self.Enemies[0].health = 3
-            
+
             self.player = Entity()
             self.player.camera_pivot = Entity(parent=self.player, y=2)
 
@@ -45,12 +45,15 @@ class aim_trainer:
     def start(self):
         self.app.run()
 
+    def close(self):
+        application.quit()
+        
     def reset(self, render_mode=None):
         self.__init__(self.render_mode)
 
     def handle_input(self, key="none"):
         if key == 'escape':
-            application.quit()
+            self.close()
 
         if key == 'right arrow':
             self.player.camera_pivot.rotation_y += 1
