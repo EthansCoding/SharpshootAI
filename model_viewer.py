@@ -6,12 +6,13 @@ parser = argparse.ArgumentParser(description="Playback a specific model that has
 
 parser.add_argument("model", type=str,help="Path to the model folder")
 parser.add_argument("--time", type=int, default=1000, help="The number of steps to simulate")
+parser.add_argument("--movement-type", type=str, default="simple", help="The type of model!")
 
 args = parser.parse_args()
 
 modelPath = args.model+"/model.zip"
 
-model = PPO.load(modelPath, env=AimTrainerEnv(render_mode="playback"))
+model = PPO.load(modelPath, env=AimTrainerEnv(render_mode="playback", movement_type=args.movement_type))
 
 obs = model.env.reset()
 
@@ -20,5 +21,6 @@ for _step in range(args.time):
         obs,
         deterministic=True
     )
-
+    
     obs, reward, terminated, truncated = model.env.step(action)
+    print(reward)

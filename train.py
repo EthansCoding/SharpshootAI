@@ -7,13 +7,14 @@ import argparse
 parser = argparse.ArgumentParser(description="Train a PPO model for the Aim Trainer environment.")
 parser.add_argument("--timesteps", type=int, default=100_000, help="Total number of timesteps for training the model.")
 parser.add_argument("--model-path", type=str, default="models/ppo_aim_trainer", help="Path to save the trained model.")
+parser.add_argument("--movement-type", type=str, default="simple", help="Type of movement smooth is default")
 
 args = parser.parse_args()
 
 models_dir = Path(args.model_path)
 models_dir.mkdir(parents=True, exist_ok=True)
 
-env = AimTrainerEnv(render_mode=None)
+env = AimTrainerEnv(render_mode=None, movement_type=args.movement_type)
 
 model = PPO("MlpPolicy", env, verbose=1)
 

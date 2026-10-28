@@ -63,10 +63,14 @@ class aim_trainer:
             destroy(enemy)
         self.startEnemies()
 
-        print(f"Kills since last reset: {self.killCount}")
         self.killCount = 0
         
         self.player.camera_pivot.rotation = (0, 0, 0)
+
+    def smooth_input(self, input=(0, 0, 0)):
+        self.player.camera_pivot.rotation_y += input[0]
+        self.player.camera_pivot.rotation_x += input[1]
+        self.shoot()
 
     def handle_input(self, key="none"):
         if key == 'escape':
@@ -86,25 +90,27 @@ class aim_trainer:
 
         # Detect shooting (left mouse button click)
         if key == 'e':
+            self.shoot()
             
-            # Shoot the raycast from the camera's world position 
-            hit_info = raycast(
-                origin=self.player.camera_pivot.world_position, 
-                direction=self.player.camera_pivot.forward, 
-                distance=30, 
-                ignore=(self.player,) # Don't hit yourself!
-            )
             
-            # Check if the raycast hit an object with a collider
-            if hit_info.hit:
-                
-                if hit_info.entity in self.Enemies:
-                    hit_info.entity.health -= 1
-                    if hit_info.entity.health <= 0:
-                        self.killCount += 1
-                        destroy(hit_info.entity)
-                        self.Enemies.remove(hit_info.entity)
-                        self.addEnemy()
+
+    def shoot(self):
+        hit_info = raycast(
+            origin=self.player.camera_pivot.world_position, 
+            direction=self.player.camera_pivot.forward, 
+            distance=30, 
+            ignore=(self.player,) # Don't hit yourself!
+        )
+        
+        # Check if the raycast hit an object with a collider
+        if hit_info.hit:
+            if hit_info.entity in self.Enemies:
+                hit_info.entity.health -= 1
+                if hit_info.entity.health <= 0:
+                    self.killCount += 1
+                    destroy(hit_info.entity)
+                    self.Enemies.remove(hit_info.entity)
+                    self.addEnemy()
 
     def addEnemy(self):
         new_enemy = Entity(collider='sphere', model='sphere', texture='verity', position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10)))
