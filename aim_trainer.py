@@ -22,14 +22,13 @@ class aim_trainer:
             ignore_paused=True
         )
 
-        self.startEnemies()
-
         self.killCount = 0
 
         if self.render_mode == "human":
             self.renderScene() #Only render scene for humans and playback
         
             self.player = FirstPersonController()
+            self.player.cursor.enabled = False
         
             self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
         elif self.render_mode == "playback":
@@ -48,6 +47,8 @@ class aim_trainer:
             self.player = Entity() #Use just entity and pivot for logic only headless
             self.player.camera_pivot = Entity(parent=self.player, y=2)
 
+        self.startEnemies()
+
     def step(self):
         self.app.step()
 
@@ -61,7 +62,7 @@ class aim_trainer:
         for enemy in self.Enemies:
             destroy(enemy)
         self.startEnemies()
-        
+
         print(f"Kills since last reset: {self.killCount}")
         self.killCount = 0
         
@@ -106,14 +107,21 @@ class aim_trainer:
                         self.addEnemy()
 
     def addEnemy(self):
-        new_enemy = Entity(collider='sphere', model='sphere', color=color.blue, position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10)))
+        new_enemy = Entity(collider='sphere', model='sphere', texture='verity', position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10)))
         new_enemy.health = 3
+        new_enemy.look_at(self.player)
+        new_enemy.texture_offset = (-0.25, 0)
         self.Enemies.append(new_enemy)
 
     def renderScene(self):
-        self.ground = Entity(model='plane', collider='box', scale=100, texture='grass', texture_scale=(4, 4))
-        self.sky = Sky()
+        self.ground = Entity(model='plane', collider='box', scale=100, texture='bricks', texture_scale=(50, 50))
+        Walls = []
+        Walls.append(Entity(model='cube',collider='box',scale=(22, 10, 0.2),texture='planks',texture_scale=(11,5),position=(0,0,-11)))
+        Walls.append(Entity(model='cube',collider='box',scale=(22, 10, 0.2),texture='planks',texture_scale=(11,5),position=(0,0,11)))
+        Walls.append(Entity(model='cube',collider='box',scale=(.2, 10, 22),texture='planks',texture_scale=(11,5),position=(-11,0,0)))
+        Walls.append(Entity(model='cube',collider='box',scale=(.2, 10, 22),texture='planks',texture_scale=(11,5),position=(11,0,0)))
+        self.sky = Sky(texture="sky", model='sphere', double_sided=True, texture_scale=(1,1))
 
     def startEnemies(self):
-        self.enemies = []
+        self.Enemies = []
         self.addEnemy()
