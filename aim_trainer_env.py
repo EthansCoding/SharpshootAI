@@ -7,7 +7,7 @@ class AimTrainerEnv(gym.Env):
     def __init__(self, render_mode=None):
         super().__init__()
 
-        self.action_space = spaces.Discrete(5)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
+        self.action_space = spaces.Discrete(6)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
 
         low = np.array([-1, -1, -1, -1], dtype=np.float32)
         high = np.array([1, 1, 1, 1], dtype=np.float32)
@@ -38,9 +38,13 @@ class AimTrainerEnv(gym.Env):
 
         thetaXY, thetaZX = self.getAngleToEnemy()
 
-        reward = (abs(beforeXY) - abs(thetaXY)) * .2 + (abs(beforeZX) - abs(thetaZX)) * .2
+        reward = 0
+        if action != 4:
+            reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             reward += 3
+        if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
+            reward -= 1
 
         observation = np.array([np.cos(thetaXY), np.sin(thetaXY), np.cos(thetaZX), np.sin(thetaZX)], dtype=np.float32)
 
