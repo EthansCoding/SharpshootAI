@@ -4,10 +4,16 @@ import numpy as np
 from aim_trainer import aim_trainer
 
 class AimTrainerEnv(gym.Env):
-    def __init__(self, render_mode=None):
+    def __init__(self, render_mode=None, movement_type="simple"):
         super().__init__()
 
-        self.action_space = spaces.Discrete(6)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
+        self.movement_type = movement_type
+        if self.movement_type == "simple":
+            self.action_space = spaces.Discrete(6)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
+        if self.movement_type == "smooth":
+            low = np.array([-1, -1, 0], dtype=np.float32)
+            high = np.array([1, 1, 1], dtype=np.float32)
+            self.action_space = spaces.Box(low=low, high=high)
 
         low = np.array([-1, -1, -1, -1], dtype=np.float32)
         high = np.array([1, 1, 1, 1], dtype=np.float32)
@@ -20,10 +26,7 @@ class AimTrainerEnv(gym.Env):
 
         return np.zeros(4, dtype=np.float32), {}
 
-    def step(self, action):
-        beforeXY, beforeZX = self.getAngleToEnemy()
-        beforeDMG = self.aim_trainer_instance.Enemies[0].health
-
+    def simpleAction(self, action):
         if action == 0:
             self.aim_trainer_instance.handle_input('left arrow')
         elif action == 1:
@@ -36,8 +39,12 @@ class AimTrainerEnv(gym.Env):
             self.aim_trainer_instance.handle_input('e')
         self.aim_trainer_instance.step()
 
-        thetaXY, thetaZX = self.getAngleToEnemy()
+    def smoothAction(self, action):
+        self.aim_trainer_instance.smooth_input(action)
+        self.aim_trainer_instance.step()
 
+    def simpleReward(self, action, angles, beforeDMG):
+        beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = 0
         if action != 4:
             reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
@@ -45,6 +52,32 @@ class AimTrainerEnv(gym.Env):
             reward += 3
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
             reward -= 1
+        return reward
+
+    def smoothReward(self, action, angles, beforeDMG):
+        beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
+        reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
+        if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
+            reward += 3
+        if action[2] != 0 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
+            reward -= 1
+        return reward
+
+    def step(self, action):
+        beforeXY, beforeZX = self.getAngleToEnemy()
+        beforeDMG = self.aim_trainer_instance.Enemies[0].health
+
+        if self.movement_type == "simple":
+            self.simpleAction(action)
+        if self.movement_type == "smooth":
+            self.smoothAction(action)
+
+        thetaXY, thetaZX = self.getAngleToEnemy()
+
+        if self.movement_type == "simple":
+            reward = self.simpleReward(action, [beforeXY, beforeZX, thetaXY, thetaZX], beforeDMG)
+        if self.movement_type == "smooth":
+            reward = self.smoothReward(action, [beforeXY, beforeZX, thetaXY, thetaZX], beforeDMG)
 
         observation = np.array([np.cos(thetaXY), np.sin(thetaXY), np.cos(thetaZX), np.sin(thetaZX)], dtype=np.float32)
 
