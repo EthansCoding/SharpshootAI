@@ -14,14 +14,33 @@ args = parser.parse_args()
 
 config_valid = True
 
-modelPath = Path(args.model+"/model.zip")
+folder = Path(args.model)
+if not folder.is_dir():
+    config_valid = False
+    pretty_output.warning(f"{folder} is not a valid directory")
+    
+files = sorted(folder.glob("*.zip"))
+if len(files) == 0:
+    config_valid = False
+    pretty_output.warning(f"No model files found in {folder}")
+for number, path in enumerate(files, start=1):
+    print(f"{number}: {path.name}")
+
+while True:
+    try:
+        choice = int(input("Select a model to playback by entering the corresponding number: "))
+        if 1 <= choice <= len(files):
+            modelPath = files[choice - 1]
+            break
+        else:
+            print(f"Invalid choice. Please enter a number between 1 and {len(files)}.")
+    except ValueError:
+        print("Invalid input. Please enter a valid number.")
+        pass
 
 if args.time < 1 or args.time > 1_000_000:
     config_valid = False
     pretty_output.warning(f"--time: {args.time} is out of bounds 1 to 1,000,000")
-if not modelPath.exists():
-    config_valid = False
-    pretty_output.warning(f"{modelPath} does not exist, check if the model is stored at that location")
 if args.movement_type not in ["simple", "smooth"]:
     config_valid = False
     pretty_output.warning(f"{args.movement_type} is not a valid choice. Choose either simple or smooth, and make sure it correlates with the trained model")

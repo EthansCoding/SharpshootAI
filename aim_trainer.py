@@ -1,5 +1,6 @@
 from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
+import datetime
 
 class aim_trainer:
 
@@ -62,14 +63,19 @@ class aim_trainer:
             destroy(enemy)
         self.startEnemies()
 
-        self.killCount = 0
+        if render_mode is not None:
+            self.killCount = 0
+            self.killCountText.text = f"Kills: {self.killCount}"
+            self.killTimes = []
+            self.avgKillTimeText.text = "Average Kill Time: 0.00s"
         
         self.player.camera_pivot.rotation = (0, 0, 0)
 
     def smooth_input(self, input=(0, 0, 0)):
         self.player.camera_pivot.rotation_y += input[0]
         self.player.camera_pivot.rotation_x += input[1]
-        self.shoot()
+        if input[2] >= 0:
+            self.shoot()
 
     def handle_input(self, key="none"):
         if key == 'escape':
@@ -106,7 +112,18 @@ class aim_trainer:
             if hit_info.entity in self.Enemies:
                 hit_info.entity.health -= 1
                 if hit_info.entity.health <= 0:
-                    self.killCount += 1
+                    if self.render_mode is not None:
+                        self.killCount += 1
+                        self.killCountText.text = f"Kills: {self.killCount}"
+                        self.killTimes.append(datetime.datetime.now())
+                        if len(self.killTimes) > 1:
+                            durations = [
+                                (self.killTimes[i] - self.killTimes[i - 1]).total_seconds()
+                                for i in range(1, len(self.killTimes))
+                            ]
+                            average = sum(durations) / len(durations) if durations else 0
+                        else: average = 0
+                        self.avgKillTimeText.text = f"Average Kill Time: {average:.2f}s"
                     destroy(hit_info.entity)
                     self.Enemies.remove(hit_info.entity)
                     self.addEnemy()
@@ -126,6 +143,10 @@ class aim_trainer:
         Walls.append(Entity(model='cube',collider='box',scale=(.2, 10, 22),texture='planks',texture_scale=(11,5),position=(-11,0,0)))
         Walls.append(Entity(model='cube',collider='box',scale=(.2, 10, 22),texture='planks',texture_scale=(11,5),position=(11,0,0)))
         self.sky = Sky(texture="sky", model='sphere', double_sided=True, texture_scale=(1,1))
+        self.killCount = 0
+        self.killCountText = Text(text=f"Kills: {self.killCount}",font = "Avara.ttf", position=(-0.85, 0.45), scale=2, color=color.black)
+        self.killTimes = []
+        self.avgKillTimeText = Text(text="Average Kill Time: 0.00s",font = "Avara.ttf", position=(-0.85, 0.4), scale=2, color=color.black)
 
     def startEnemies(self):
         self.Enemies = []

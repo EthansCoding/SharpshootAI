@@ -51,7 +51,7 @@ class AimTrainerEnv(gym.Env):
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             reward += 3
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 1
+            reward -= 2
         return reward
 
     def smoothReward(self, action, angles, beforeDMG):
@@ -59,8 +59,8 @@ class AimTrainerEnv(gym.Env):
         reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             reward += 3
-        if action[2] != 0 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 1
+        if action[2] >= 0 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
+            reward -= 2
         return reward
 
     def step(self, action):
