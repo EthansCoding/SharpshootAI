@@ -2,11 +2,22 @@ from ursina import *
 from ursina.prefabs.first_person_controller import FirstPersonController
 import datetime
 
+'''
+Aim Trainer game. It creates a 3D environment where a player can shoot at enemies.
+The game can be created in 3 different ways. 
+1. Human mode. - Creates a 3D environment where a human can play the game and move and shoot.
+2. Playback mode. - Creates a 3D environment where the game can be played back with a camera and crosshair but no player movement.
+3. Logic only mode. - Creates a 3D environment where the game logic is executed without any visual rendering.
+'''
 class aim_trainer:
-
+    '''
+    Aim Trainer initialization. It creates a 3D environment where a player can shoot at enemies.
+    render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
+    '''
     def __init__(self, render_mode=None):
         self.render_mode = render_mode
 
+        #This section either creates or doesn't create a window and launches the app.
         window_type = 'onscreen' if render_mode in ["human", "playback"] else 'none'
         self.app = Ursina(
             launch_ui=False,
@@ -17,17 +28,20 @@ class aim_trainer:
             size=(1920, 1080)
         )
 
+        #This section creates an input handler that listens for key presses and calls the handle_input method.
         self.input_handler = Entity(
             input=self.handle_input,
             ignore_paused=True
         )
 
         self.killCount = 0
+        self.killTimes = []
 
+        #Depending on input mode the game render different important pieces.
         if self.render_mode == "human":
             self.renderScene() #Only render scene for humans and playback
         
-            self.player = FirstPersonController()
+            self.player = FirstPersonController() #First person controller includes movement.
             self.player.cursor.enabled = False
         
             self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
@@ -47,6 +61,7 @@ class aim_trainer:
             self.player = Entity() #Use just entity and pivot for logic only headless
             self.player.camera_pivot = Entity(parent=self.player, y=2)
 
+        #Always need enemies
         self.startEnemies()
 
     def step(self):
@@ -57,26 +72,36 @@ class aim_trainer:
 
     def close(self):
         application.quit()
-        
-    def reset(self, render_mode=None):
+
+    '''
+    Reset the game state.
+    '''
+    def reset(self):
         for enemy in self.Enemies:
             destroy(enemy)
         self.startEnemies()
 
-        if render_mode is not None:
-            self.killCount = 0
+        self.killCount = 0
+        self.killTimes = []
+        if self.render_mode is not None:
             self.killCountText.text = f"Kills: {self.killCount}"
-            self.killTimes = []
             self.avgKillTimeText.text = "Average Kill Time: 0.00s"
         
         self.player.camera_pivot.rotation = (0, 0, 0)
 
+    '''
+    Handle input if the game is being played by a smooth ML model.
+    '''
     def smooth_input(self, input=(0, 0, 0)):
         self.player.camera_pivot.rotation_y += input[0]
         self.player.camera_pivot.rotation_x += input[1]
         if input[2] >= 0:
             self.shoot()
 
+    '''
+    Handle input if the game is being played by a simple ML model.
+    Or a human player.
+    '''
     def handle_input(self, key="none"):
         if key == 'escape':
             self.close()
@@ -97,8 +122,10 @@ class aim_trainer:
         if key == 'e':
             self.shoot()
             
-            
-
+    '''
+    Shoot a ray from the player's camera and check if it hits an enemy.
+    If it does, reduce the enemy's health and update the kill count and average kill time.
+    '''
     def shoot(self):
         hit_info = raycast(
             origin=self.player.camera_pivot.world_position, 
@@ -128,6 +155,9 @@ class aim_trainer:
                     self.Enemies.remove(hit_info.entity)
                     self.addEnemy()
 
+    '''
+    Add a new enemy to the game at a random position.
+    '''
     def addEnemy(self):
         new_enemy = Entity(collider='sphere', model='sphere', texture='verity', position=(random.randint(-10, 10), random.randint(1, 10), random.randint(-10, 10)))
         new_enemy.health = 3
@@ -135,6 +165,9 @@ class aim_trainer:
         new_enemy.texture_offset = (-0.25, 0)
         self.Enemies.append(new_enemy)
 
+    '''
+    Render the game scene with ground, walls, sky, and UI elements for kill count and average kill time.
+    '''
     def renderScene(self):
         self.ground = Entity(model='plane', collider='box', scale=100, texture='bricks', texture_scale=(50, 50))
         Walls = []
@@ -148,6 +181,9 @@ class aim_trainer:
         self.killTimes = []
         self.avgKillTimeText = Text(text="Average Kill Time: 0.00s",font = "Avara.ttf", position=(-0.85, 0.4), scale=2, color=color.black)
 
+    '''
+    Start the enemies list and add the first enemy to the game.
+    '''
     def startEnemies(self):
         self.Enemies = []
         self.addEnemy()

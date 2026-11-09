@@ -5,6 +5,7 @@ from pathlib import Path
 import argparse
 import pretty_output
 
+#Add the arguments for the command.
 parser = argparse.ArgumentParser(description="Train a PPO model for the Aim Trainer environment.")
 parser.add_argument("--timesteps", type=int, default=100_000, help="Total number of timesteps for training the model.")
 parser.add_argument("--model-path", type=str, default="models/ppo_aim_trainer", help="Path to save the trained model.")
@@ -15,6 +16,7 @@ args = parser.parse_args()
 
 config_valid = True
 
+# Validate the arguments
 if args.timesteps < 0 or args.timesteps > 4_000_000:
     config_valid = False
     pretty_output.warning("Time steps must be between 1 and 4,000,000")
@@ -31,11 +33,13 @@ if config_valid:
 
     env = AimTrainerEnv(render_mode=None, movement_type=args.movement_type)
 
+    #initialize the PPO model with MlpPolicy and the AimTrainerEnv environment
     model = PPO("MlpPolicy", env, verbose=1)
 
     timesteps_per_checkpoint = args.save_checkpoints
     total_timesteps = 0
 
+    #Train the model and save checkpoints at specified intervals
     while total_timesteps < args.timesteps:
         model.learn(
             total_timesteps = timesteps_per_checkpoint,

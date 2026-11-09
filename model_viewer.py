@@ -4,8 +4,8 @@ from pathlib import Path
 import pretty_output
 import argparse
 
+#Lines 8-11 add the arguments.
 parser = argparse.ArgumentParser(description="Playback a specific model that has been trained to play AimTrainer")
-
 parser.add_argument("model", type=str,help="Path to the model folder")
 parser.add_argument("--time", type=int, default=1000, help="The number of steps to simulate")
 parser.add_argument("--movement-type", type=str, default="simple", help="The type of model!")
@@ -14,11 +14,14 @@ args = parser.parse_args()
 
 config_valid = True
 
+'''
+This validates the model and what model is being ran.
+'''
 folder = Path(args.model)
 if not folder.is_dir():
     config_valid = False
     pretty_output.warning(f"{folder} is not a valid directory")
-    
+
 files = sorted(folder.glob("*.zip"))
 if len(files) == 0:
     config_valid = False
@@ -56,6 +59,9 @@ else:
 if config_valid:
     obs = model.env.reset()
 
+    '''
+    Step through for all of the time steps and play it back for the user.
+    '''
     for _step in range(args.time):
         action, _ = model.predict(
             obs,

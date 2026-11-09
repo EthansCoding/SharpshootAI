@@ -3,7 +3,16 @@ from gymnasium import spaces
 import numpy as np
 from aim_trainer import aim_trainer
 
+'''
+Wraps the aim_trainer class into a Gymnasium environment for reinforcement learning.
+This class allows the aim_trainer game to be used as an environment for training reinforcement learning models
+'''
 class AimTrainerEnv(gym.Env):
+    '''
+    The init for the AimTrainerEnv class. It initializes the environment with the specified render mode and movement type.
+    render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
+    movement_type: str - The type of movement for the agent. It can be "simple" or "smooth". "simple" uses discrete actions, while "smooth" uses continuous actions.
+    '''
     def __init__(self, render_mode=None, movement_type="simple"):
         super().__init__()
 
@@ -21,11 +30,17 @@ class AimTrainerEnv(gym.Env):
 
         self.aim_trainer_instance = aim_trainer(render_mode=render_mode)
 
-    def reset(self, seed=None, render_mode=None, options=None):
-        self.aim_trainer_instance.reset(render_mode=render_mode)
+    '''
+    Reset the environment to its initial state. This method is called at the beginning of each episode.
+    '''
+    def reset(self, seed=None, options=None):
+        self.aim_trainer_instance.reset()
 
         return np.zeros(4, dtype=np.float32), {}
-
+    
+    '''
+    Execute a simple action in the environment.
+    '''
     def simpleAction(self, action):
         if action == 0:
             self.aim_trainer_instance.handle_input('left arrow')
@@ -39,10 +54,17 @@ class AimTrainerEnv(gym.Env):
             self.aim_trainer_instance.handle_input('e')
         self.aim_trainer_instance.step()
 
+    '''
+    Execute a smooth action in the environment.
+    The action is a continuous vector where the first two elements represent the movement in the x and
+    y directions, and the third element represents whether to shoot or not.'''
     def smoothAction(self, action):
         self.aim_trainer_instance.smooth_input(action)
         self.aim_trainer_instance.step()
 
+    '''
+    Calculate the reward for a simple action based on the change in angle to the enemy and whether the enemy was hit.
+    '''
     def simpleReward(self, action, angles, beforeDMG):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = 0
@@ -54,6 +76,9 @@ class AimTrainerEnv(gym.Env):
             reward -= 2
         return reward
 
+    '''
+    Calculate the reward for a smooth action based on the change in angle to the enemy and whether the enemy was hit.
+    '''
     def smoothReward(self, action, angles, beforeDMG):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
@@ -63,6 +88,10 @@ class AimTrainerEnv(gym.Env):
             reward -= 2
         return reward
 
+    '''
+    Take a step in the environment with the given action.
+    This method executes the action, calculates the reward, and returns the new observation, reward, termination status, truncation status, and additional info.
+    '''
     def step(self, action):
         beforeXY, beforeZX = self.getAngleToEnemy()
         beforeDMG = self.aim_trainer_instance.Enemies[0].health
@@ -87,6 +116,9 @@ class AimTrainerEnv(gym.Env):
 
         return (observation, reward, terminated, truncated, info)
 
+    '''
+    Returns the angle to the enemy in both the XY and ZX planes. This method calculates the yaw and pitch errors based on the current camera orientation and the position of the enemy.
+    '''
     def getAngleToEnemy(self):
         enemy = self.aim_trainer_instance.Enemies[0].world_position
         pivot = self.aim_trainer_instance.player.camera_pivot 
@@ -106,5 +138,7 @@ class AimTrainerEnv(gym.Env):
 
         return yaw_error, pitch_error
 
+    '''
+    Closes the environment and the underlying aim_trainer instance. This method is called when the environment is no longer needed.'''
     def close(self):
         self.aim_trainer_instance.close()
