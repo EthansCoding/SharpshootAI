@@ -1,3 +1,6 @@
+'''
+This writes pretty output to the console for warnings and errors. It is used to make important messages stand out in the console output.
+'''
 def warning(output):
     topBorder = "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-"
     sideLength = 0
