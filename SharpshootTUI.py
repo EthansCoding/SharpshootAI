@@ -1,10 +1,11 @@
 import asyncio
-from multiprocessing import Process, Value, Queue
+from multiprocessing import Process, Value, Queue, Array
 from queue import Empty
 from pathlib import Path
 from collections.abc import Iterable
 from textual import on, work
 from textual.app import App, ComposeResult
+from textual.containers import Horizontal
 from contextlib import redirect_stdout, redirect_stderr
 from textual.widgets import (
     Button,
@@ -85,7 +86,7 @@ class SharpshootTUI(App):
         border: solid $primary;
     }
 
-    Input, Select {
+    Input, Select, Switch {
         margin-bottom: 1;
     }
 
@@ -95,16 +96,38 @@ class SharpshootTUI(App):
     }
 
     Button {
+        align: center top;
         margin-right: 1;
     }
 
     #status {
+        width: 100%;
+        text-align: center;
         margin: 1 0;
     }
 
+    #progress {
+        width: 100%;
+    }
+
+    #progress Bar {
+        width: 1fr;
+    }
+
     RichLog {
-        height: 10;
+        height: 1fr;
         border: solid $secondary;
+    }
+
+    .button-row {
+        width: 100%;
+        height: auto;
+        align-horizontal: center;
+    }
+
+    #selected {
+        width: 100%;
+        text-align: center;
     }
     """
 
@@ -117,8 +140,6 @@ class SharpshootTUI(App):
 
         with TabbedContent():
             with TabPane("Train"):
-                yield Static("Select training params", id="selection")
-
                 yield Label("Model Name")
                 yield Input(value="Model Name", id="model_name")
 
@@ -131,8 +152,9 @@ class SharpshootTUI(App):
                 yield Label("Save checkpoints")
                 yield Input(value="10000", type="integer", id="train_checkpoints")
 
-                yield Button("Train", id="train")
-            with TabPane("View"):
+                with Horizontal(classes="button-row"):
+                    yield Button("Train", id="train", variant="success")
+            with TabPane("View", id="view-pane"):
                 yield FileTree(folder, id="Files")
                 yield Static("Select a ZIP file", id="selected", markup=False)
 
@@ -142,9 +164,13 @@ class SharpshootTUI(App):
                 yield Label("Timesteps")
                 yield Input(value="1000", type="integer", id="timesteps")
 
-                yield Button("Run", id="run", variant="success")
+                with Horizontal(classes="button-row"):
+                    yield Button("Run", id="run", variant="success")
             with TabPane("Logs"):
                 yield RichLog(id="output", markup=False, wrap=True, max_lines=2000)
+            with TabPane("Training-Data"):
+                yield Static("Kills: 0", id="kills")
+                yield Static("Avg Kill Time: 0.00s", id="killtimes")
                 
         yield Static("Idle", id="status")
         yield ProgressBar(total=100, show_eta=False, id="progress")
@@ -155,7 +181,7 @@ class SharpshootTUI(App):
             selected_path = getattr(self, "selected_path", None)
             smooth = self.query_one("#smooth", Switch).value
             movement_type = "smooth" if smooth else "simple"
-            timesteps = int(self.query_one("#train_timesteps", Input).value)
+            timesteps = int(self.query_one("#timesteps", Input).value)
 
             self.query_one("#status", Static).update(
                 "Running model_viewer (May take a few moments to appear)"
@@ -182,11 +208,14 @@ class SharpshootTUI(App):
     async def launch_training(self, model_path, movement_type, save_checkpoints, timesteps):
         completion = Value("d", 0.0)
         output_queue = Queue()
+        data = Array("d", [0.0, 0.0])
 
         progress = self.query_one("#progress", ProgressBar)
         status = self.query_one("#status", Static)
         log = self.query_one("#output", RichLog)
         button = self.query_one("#train", Button)
+        kills = self.query_one("#kills", Static)
+        killtimes = self.query_one('#killtimes', Static)
 
         progress.update(total=100, progress=0)
         button.disabled = True
@@ -194,7 +223,7 @@ class SharpshootTUI(App):
 
         process = Process(
             target=train_with_output,
-            args=(output_queue, model_path, movement_type, save_checkpoints, timesteps, completion)
+            args=(output_queue, model_path, movement_type, save_checkpoints, timesteps, completion, data)
         )
 
         pending = ""
@@ -226,6 +255,8 @@ class SharpshootTUI(App):
                         log.write(line.rstrip("\r"))
 
                 progress.update(progress=completion.value * 100)
+                kills.update(f"Kills: {int(data[0])}")
+                killtimes.update(f"Avg Kill Time: {data[1]: .2f}")
 
                 if finished and queue_empty:
                     break
@@ -283,7 +314,7 @@ class SharpshootTUI(App):
                 model_path,
                 movement_type,
                 timesteps,
-                completion,
+                completion
             ),
         )
 
@@ -352,7 +383,9 @@ class SharpshootTUI(App):
             output_queue.close()
             button.disabled = False
 
-
+    @on(TabbedContent.TabActivated, pane="#view-pane")
+    def refresh_model_files(self):
+        self.query_one("#Files", DirectoryTree).reload()
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected):
         self.selected_path = event.path
@@ -360,6 +393,9 @@ class SharpshootTUI(App):
         self.query_one("#selected", Static).update(
             f"Selected: {self.selected_path}"
         )
+
+    def on_mount(self):
+        self.theme = "rose-pine-moon"
 
 if __name__ == "__main__":
     SharpshootTUI().run()

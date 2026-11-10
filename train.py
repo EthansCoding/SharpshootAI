@@ -5,11 +5,11 @@ from pathlib import Path
 import argparse
 import pretty_output
 
-def Train(model_path, movement_type, save_checkpoints, timesteps, completion=None):
+def Train(model_path, movement_type, save_checkpoints, timesteps, completion=None, data=[0,0]):
     models_dir = Path(model_path)
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    env = AimTrainerEnv(render_mode=None, movement_type=movement_type)
+    env = AimTrainerEnv(render_mode=None, movement_type=movement_type, data=data)
 
     #initialize the PPO model with MlpPolicy and the AimTrainerEnv environment
     model = PPO("MlpPolicy", env, verbose=1)

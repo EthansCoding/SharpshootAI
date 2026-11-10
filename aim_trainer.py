@@ -139,10 +139,10 @@ class aim_trainer:
             if hit_info.entity in self.Enemies:
                 hit_info.entity.health -= 1
                 if hit_info.entity.health <= 0:
+                    self.killCount += 1
+                    self.killTimes.append(datetime.datetime.now())
                     if self.render_mode is not None:
-                        self.killCount += 1
                         self.killCountText.text = f"Kills: {self.killCount}"
-                        self.killTimes.append(datetime.datetime.now())
                         if len(self.killTimes) > 1:
                             durations = [
                                 (self.killTimes[i] - self.killTimes[i - 1]).total_seconds()

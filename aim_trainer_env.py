@@ -13,9 +13,9 @@ class AimTrainerEnv(gym.Env):
     render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
     movement_type: str - The type of movement for the agent. It can be "simple" or "smooth". "simple" uses discrete actions, while "smooth" uses continuous actions.
     '''
-    def __init__(self, render_mode=None, movement_type="simple"):
+    def __init__(self, render_mode=None, movement_type="simple", data=[0, 0]):
         super().__init__()
-
+        self.data = data
         self.movement_type = movement_type
         if self.movement_type == "simple":
             self.action_space = spaces.Discrete(5)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
@@ -107,6 +107,15 @@ class AimTrainerEnv(gym.Env):
             reward = self.simpleReward(action, [beforeXY, beforeZX, thetaXY, thetaZX], beforeDMG)
         if self.movement_type == "smooth":
             reward = self.smoothReward(action, [beforeXY, beforeZX, thetaXY, thetaZX], beforeDMG)
+
+        if len(self.aim_trainer_instance.killTimes) > 1:
+            durations = [
+                (self.aim_trainer_instance.killTimes[i] - self.aim_trainer_instance.killTimes[i - 1]).total_seconds()
+                for i in range(1, len(self.aim_trainer_instance.killTimes))
+            ]
+            average = sum(durations) / len(durations) if durations else 0
+        else: average = 0
+        self.data[0], self.data[1] = self.aim_trainer_instance.killCount, average
 
         observation = np.array([np.cos(thetaXY), np.sin(thetaXY), np.cos(thetaZX), np.sin(thetaZX)], dtype=np.float32)
 
