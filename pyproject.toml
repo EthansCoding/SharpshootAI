@@ -11,6 +11,7 @@ dependencies = [
     "ursina>=8.3.0",
     "stable-baselines3[extra]",
     "gymnasium",
+    "textual>=8.2.8",
 ]
 
 [project.scripts]

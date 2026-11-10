@@ -18,7 +18,7 @@ class AimTrainerEnv(gym.Env):
 
         self.movement_type = movement_type
         if self.movement_type == "simple":
-            self.action_space = spaces.Discrete(6)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
+            self.action_space = spaces.Discrete(5)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
         if self.movement_type == "smooth":
             low = np.array([-1, -1, 0], dtype=np.float32)
             high = np.array([1, 1, 1], dtype=np.float32)
