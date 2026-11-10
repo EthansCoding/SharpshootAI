@@ -22,6 +22,9 @@ from textual.widgets import (
     RichLog
 )
 
+'''
+Textual class item that draws a directory with all paths and .zip files.
+'''
 class FileTree(DirectoryTree):
     def filter_paths(self, paths: Iterable[Path]):
         return [
@@ -30,6 +33,9 @@ class FileTree(DirectoryTree):
             if path.is_dir() or path.suffix.lower() == ".zip"
         ]
 
+'''
+QueueOutput creates a queue of the logs from the programs we run from this TUI
+'''
 class QueueOutput:
     def __init__(self, queue):
         self.queue = queue
@@ -42,6 +48,9 @@ class QueueOutput:
     def flush(self):
         pass
 
+'''
+This runs the model viewer without output in the TUI, and instead sent to a queue.
+'''
 def playback_with_output(queue, *args):
     import traceback
 
@@ -57,6 +66,9 @@ def playback_with_output(queue, *args):
         finally:
             queue.put(None)
 
+'''
+This runs the training without output in the TUI, instead sent to a richlog.
+'''
 def train_with_output(queue, *args):
     import traceback
 
@@ -72,9 +84,13 @@ def train_with_output(queue, *args):
         finally:
             queue.put(None)
 
+'''
+This is the TUI app
+'''
 class SharpshootTUI(App):
     TITLE = "SharpshootAI"
     BINDINGS = [("q", "quit", "Quit")]
+    DEFAULT_THEME = "rose-pine-moon"
 
     CSS= """
     TabbedContent {
@@ -134,6 +150,10 @@ class SharpshootTUI(App):
     def __init__(self):
         super().__init__()
 
+    '''
+    This function composes the panes of the app, add to it to have more items
+    in the app
+    '''
     def compose(self) -> ComposeResult:
         folder = Path(__file__).resolve().parent / "models"
         yield Header()
@@ -176,6 +196,7 @@ class SharpshootTUI(App):
         yield ProgressBar(total=100, show_eta=False, id="progress")
         yield Footer()
 
+    #Runs on button press, currently hooked into train and run buttons.
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "run":
             selected_path = getattr(self, "selected_path", None)
@@ -202,14 +223,17 @@ class SharpshootTUI(App):
 
             self.launch_training(model_path, movement_type, checkpoints, timesteps)
 
-            
-
+    '''
+    This function launches the training asynchronously
+    '''
     @work
     async def launch_training(self, model_path, movement_type, save_checkpoints, timesteps):
+        #These variables are all information we are getting back from the other program.
         completion = Value("d", 0.0)
         output_queue = Queue()
         data = Array("d", [0.0, 0.0])
 
+        #These are the buttons, statics, progress bar and rich log.
         progress = self.query_one("#progress", ProgressBar)
         status = self.query_one("#status", Static)
         log = self.query_one("#output", RichLog)
@@ -217,10 +241,12 @@ class SharpshootTUI(App):
         kills = self.query_one("#kills", Static)
         killtimes = self.query_one('#killtimes', Static)
 
+        #Set some start values
         progress.update(total=100, progress=0)
         button.disabled = True
         status.update("Starting training...")
 
+        #Create a train with output process.
         process = Process(
             target=train_with_output,
             args=(output_queue, model_path, movement_type, save_checkpoints, timesteps, completion, data)
@@ -230,6 +256,7 @@ class SharpshootTUI(App):
         started = False
 
         try:
+            #Start the process
             process.start()
             started = True
 
@@ -238,6 +265,7 @@ class SharpshootTUI(App):
                 finished = not process.is_alive()
                 queue_empty = False
 
+                #This clears 100 outputs of the queue.
                 for _ in range(100):
                     try:
                         text = output_queue.get_nowait()
@@ -254,6 +282,7 @@ class SharpshootTUI(App):
                         line, pending = pending.split("\n", 1)
                         log.write(line.rstrip("\r"))
 
+                #Update progress, kills and killtimes.
                 progress.update(progress=completion.value * 100)
                 kills.update(f"Kills: {int(data[0])}")
                 killtimes.update(f"Avg Kill Time: {data[1]: .2f}")
@@ -279,10 +308,12 @@ class SharpshootTUI(App):
             log.write(str(error))
 
         finally:
+            #Write any extra text
             if pending:
                 log.write(pending)
 
             if started:
+                #Cancel if hasn't been quit yet.
                 if process.is_alive():
                     process.terminate()
 
@@ -290,9 +321,13 @@ class SharpshootTUI(App):
                 await asyncio.to_thread(process.join)
                 process.close()
 
+            #Re-enable button, close queue
             output_queue.close()
             button.disabled = False
 
+    '''
+    Very very similar function to the above launch_training, see comments from that.
+    '''
     @work
     async def launch_playback(self, model_path, movement_type, timesteps):
         completion = Value("d", 0.0)
@@ -383,10 +418,16 @@ class SharpshootTUI(App):
             output_queue.close()
             button.disabled = False
 
+    '''
+    When you open the view pane, it runs this which reloads our file explorer.
+    '''
     @on(TabbedContent.TabActivated, pane="#view-pane")
     def refresh_model_files(self):
         self.query_one("#Files", DirectoryTree).reload()
 
+    '''
+    When a file is selected it sets the path variable and updates text
+    '''
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected):
         self.selected_path = event.path
 
@@ -394,8 +435,11 @@ class SharpshootTUI(App):
             f"Selected: {self.selected_path}"
         )
 
+    '''
+    When opened it changes the theme to rose-pine-moon as the default theme 
+    '''
     def on_mount(self):
-        self.theme = "rose-pine-moon"
+        self.theme = self.DEFAULT_THEME
 
 if __name__ == "__main__":
     SharpshootTUI().run()
