@@ -13,10 +13,12 @@ class AimTrainerEnv(gym.Env):
     render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
     movement_type: str - The type of movement for the agent. It can be "simple" or "smooth". "simple" uses discrete actions, while "smooth" uses continuous actions.
     '''
-    def __init__(self, render_mode=None, movement_type="simple", data=[0, 0]):
+    def __init__(self, render_mode=None, movement_type="simple", data=[0, 0], isTraining=None):
         super().__init__()
         self.data = data
         self.movement_type = movement_type
+        self.isTraining = isTraining
+        self.stepCount = 0
         if self.movement_type == "simple":
             self.action_space = spaces.Discrete(5)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
         if self.movement_type == "smooth":
@@ -71,9 +73,11 @@ class AimTrainerEnv(gym.Env):
         if action != 4:
             reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
-            reward += 3
+            if self.isTraining is not None:
+                self.stepCount = 0
+            reward += 20
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 2
+            reward -= 1
         return reward
 
     '''
@@ -83,9 +87,11 @@ class AimTrainerEnv(gym.Env):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
-            reward += 3
-        if action[2] >= 0 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 2
+            if self.isTraining is not None:
+                self.stepCount = 0
+            reward += 20
+        if action[2] >= .5 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
+            reward -= 1
         return reward
 
     '''
@@ -122,6 +128,12 @@ class AimTrainerEnv(gym.Env):
         terminated = False
         truncated = False
         info = {}
+
+        if self.isTraining is not None:
+            self.stepCount += 1
+            if self.stepCount > 1000:
+                self.stepCount = 0
+                observation, _ = self.reset()
 
         return (observation, reward, terminated, truncated, info)
 

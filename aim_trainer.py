@@ -126,7 +126,7 @@ class aim_trainer:
     def smooth_input(self, input=(0, 0, 0)):
         self.player.camera_pivot.rotation_y += input[0]
         self.player.camera_pivot.rotation_x += input[1]
-        if input[2] >= 0:
+        if input[2] >= .5:
             self.shoot()
 
     '''
@@ -165,9 +165,10 @@ class aim_trainer:
             ignore=(self.player,) # Don't hit yourself!
         )
 
-        self.gun.texture = self.fire_texture
-        self.gunshot.play()
-        invoke(self.reset_gun, delay=0.5)
+        if self.render_mode in ["human", "playback"]:
+            self.gun.texture = self.fire_texture
+            self.gunshot.play()
+            invoke(self.reset_gun, delay=0.5)
         
         # Check if the raycast hit an object with a collider
         if hit_info.hit:

@@ -9,7 +9,7 @@ def Train(model_path, movement_type, save_checkpoints, timesteps, completion=Non
     models_dir = Path(model_path)
     models_dir.mkdir(parents=True, exist_ok=True)
 
-    env = AimTrainerEnv(render_mode=None, movement_type=movement_type, data=data)
+    env = AimTrainerEnv(render_mode=None, movement_type=movement_type, data=data, isTraining=True)
 
     #initialize the PPO model with MlpPolicy and the AimTrainerEnv environment
     model = PPO("MlpPolicy", env, verbose=1)
