@@ -37,13 +37,30 @@ class aim_trainer:
         self.killCount = 0
         self.killTimes = []
 
+        self.idle_texture = load_texture('assets/textures/first-person-pistol.png')
+        self.fire_texture = load_texture('assets/textures/first-person-pistol-fire.png')
+
         #Depending on input mode the game render different important pieces.
         if self.render_mode == "human":
             self.renderScene() #Only render scene for humans and playback
         
             self.player = FirstPersonController() #First person controller includes movement.
             self.player.cursor.enabled = False
-        
+
+            self.gunshot = Audio(
+                            'assets/gunshot.wav',
+                            autoplay=False,
+                            auto_destroy=False,
+                            volume=0.7
+                        )
+
+            self.gun = Entity(
+                            parent=camera.ui,
+                            model='quad',
+                            texture=self.idle_texture,
+                            position=(.45, -.3),
+                            scale=(.5, .4)
+                        )
             self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
         elif self.render_mode == "playback":
             self.renderScene() #Only render scene for humans and playback
@@ -55,7 +72,21 @@ class aim_trainer:
             camera.position = (0, 0, 0)
             camera.rotation = (0, 0, 0)
             camera.fov = 90
-        
+
+            self.gunshot = Audio(
+                'assets/gunshot.wav',
+                autoplay=False,
+                auto_destroy=False,
+                volume=0.7
+            )
+
+            self.gun = Entity(
+                parent=camera.ui,
+                model='quad',
+                texture=self.idle_texture,
+                position=(.45, -.3),
+                scale=(.5, .4)
+            )
             self.crosshair = Entity(parent=camera.ui, model='quad', scale=0.01, color=color.black)
         else:
             self.player = Entity() #Use just entity and pivot for logic only headless
@@ -133,6 +164,10 @@ class aim_trainer:
             distance=30, 
             ignore=(self.player,) # Don't hit yourself!
         )
+
+        self.gun.texture = self.fire_texture
+        self.gunshot.play()
+        invoke(self.reset_gun, delay=0.5)
         
         # Check if the raycast hit an object with a collider
         if hit_info.hit:
@@ -187,3 +222,6 @@ class aim_trainer:
     def startEnemies(self):
         self.Enemies = []
         self.addEnemy()
+
+    def reset_gun(self):
+        self.gun.texture = self.idle_texture
