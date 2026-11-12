@@ -36,7 +36,7 @@
 <h3 align="center">SharpshootAI</h3>
 
   <p align="center">
-    ML powered aimbot!
+    ML powered aimbot! 5 layers of DL to lock on! 
     <br />
     <a href="https://github.com/EthansCoding/SharpshootAI"><strong>Explore the docs »</strong></a>
     <br />
@@ -183,6 +183,10 @@ The first is Sharpshoot TUI
    * Choose a model in the directory, click on the zip file
    * Choose whether the model is a smooth or simple model
    * Choose how many time steps to simulate, running at 60 fps, 1000 is approx 15 seconds
+4. (Optional if you have super good trained model)
+   * Create data in the create data page
+   * Train a DL model in the DL tab
+   * Run that DL model.
 
 The second way is through commands
 
@@ -205,6 +209,14 @@ The second way is through commands
    ```sh
    python play.py
    ```
+
+Training Path for successful DL run:
+  * Train 250k Params Simple Model
+  * Check if it gets stuck in 5000 timesteps
+  * Generate 10,000 lines of data
+  * Check if data gets stuck
+  * Train DL model on the 10000 lines with 5000e
+  * Run that model
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
