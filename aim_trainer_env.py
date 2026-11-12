@@ -16,6 +16,8 @@ class AimTrainerEnv(gym.Env):
     '''
     REWARD_FOR_KILL = 15
     REWARD_FOR_MISS = -3
+    REPEATED_MISS_MULTIPLER = .5 #default is 1 e.g for miss = -3, -6, -9, -12
+    REPEATED_MISS_CAP = -9
     REWARD_MULTIPLIER_FOR_MOVEMENT = 4.0
 
 
@@ -26,6 +28,7 @@ class AimTrainerEnv(gym.Env):
     '''
     def __init__(self, render_mode=None, movement_type="simple", data=[0, 0], isTraining=None):
         super().__init__()
+        self.missCount = 0
         self.data = data
         self.movement_type = movement_type
         self.isTraining = isTraining
@@ -48,7 +51,7 @@ class AimTrainerEnv(gym.Env):
     '''
     def reset(self, seed=None, options=None):
         self.aim_trainer_instance.reset()
-
+        self.missCount = 0
         return np.zeros(4, dtype=np.float32), {}
     
     '''
@@ -85,11 +88,15 @@ class AimTrainerEnv(gym.Env):
             reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
             (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
+            self.missCount = 0
             if self.isTraining is not None:
                 self.stepCount = 0
             reward += self.REWARD_FOR_KILL
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward += self.REWARD_FOR_MISS
+            self.missCount += 1
+            loss = self.REWARD_FOR_MISS * (self.missCount * self.REPEATED_MISS_MULTIPLER)
+            if loss < self.REPEATED_MISS_CAP: loss = -15
+            reward += loss
         return reward
 
     '''
@@ -100,11 +107,15 @@ class AimTrainerEnv(gym.Env):
         reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
             (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
+            self.missCount = 0
             if self.isTraining is not None:
                 self.stepCount = 0
             reward += self.REWARD_FOR_KILL
         if action[2] >= .5 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward += self.REWARD_FOR_MISS
+            self.missCount +=1
+            loss = self.REWARD_FOR_MISS * (self.missCount * self.REPEATED_MISS_MULTIPLER)
+            if loss < self.REPEATED_MISS_CAP: loss = -15
+            reward += loss
         return reward
 
     '''
