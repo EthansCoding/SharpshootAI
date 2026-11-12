@@ -26,12 +26,20 @@ from textual.widgets import (
 Textual class item that draws a directory with all paths and .zip files.
 '''
 class FileTree(DirectoryTree):
+    extension = ".zip"
+
     def filter_paths(self, paths: Iterable[Path]):
         return [
             path
             for path in paths
-            if path.is_dir() or path.suffix.lower() == ".zip"
+            if path.is_dir() or path.suffix.lower() == self.extension
         ]
+
+class DatasetTree(FileTree):
+    extension = ".csv"
+
+class DLModelTree(FileTree):
+    extension = ".pt"
 
 '''
 QueueOutput creates a queue of the logs from the programs we run from this TUI
@@ -66,6 +74,21 @@ def playback_with_output(queue, *args):
         finally:
             queue.put(None)
 
+def data_with_output(queue, *args):
+    import traceback
+
+    output = QueueOutput(queue)
+
+    with redirect_stdout(output), redirect_stderr(output):
+        try:
+            from create_data import get_data
+            get_data(*args)
+        except Exception:
+            traceback.print_exc()
+            raise
+        finally:
+            queue.put(None)
+
 '''
 This runs the training without output in the TUI, instead sent to a richlog.
 '''
@@ -78,6 +101,36 @@ def train_with_output(queue, *args):
         try:
             from train import Train
             Train(*args)
+        except Exception:
+            traceback.print_exc()
+            raise
+        finally:
+            queue.put(None)
+
+def dl_train_with_output(queue, *args):
+    import traceback
+
+    output = QueueOutput(queue)
+
+    with redirect_stdout(output), redirect_stderr(output):
+        try:
+            from SharpshootDL import train
+            train(*args)
+        except Exception:
+            traceback.print_exc()
+            raise
+        finally:
+            queue.put(None)
+
+def dl_run_with_output(queue, *args):
+    import traceback
+
+    output = QueueOutput(queue)
+
+    with redirect_stdout(output), redirect_stderr(output):
+        try:
+            from SharpshootDL import run
+            run(*args)
         except Exception:
             traceback.print_exc()
             raise
@@ -155,7 +208,8 @@ class SharpshootTUI(App):
     in the app
     '''
     def compose(self) -> ComposeResult:
-        folder = Path(__file__).resolve().parent / "models"
+        project_folder = Path(__file__).resolve().parent
+        folder = project_folder / "models"
         yield Header()
 
         with TabbedContent():
@@ -186,11 +240,54 @@ class SharpshootTUI(App):
 
                 with Horizontal(classes="button-row"):
                     yield Button("Run", id="run", variant="success")
+            with TabPane("DL", id="dl-pane"):
+                with TabbedContent():
+                    with TabPane("Train", id="dl-train-pane"):
+                        yield Label("Dataset (CSV file)")
+                        yield DatasetTree(project_folder, id="dl-dataset")
+                        yield Static("Select a CSV file", id="selected-dl-dataset", markup=False)
+
+                        yield Label("Model Folder")
+                        yield Input(value="DLmodels/DLmodel", id="dl-train-model")
+
+                        yield Label("Epochs")
+                        yield Input(value="100", type="integer", id="dl-epochs")
+
+                        with Horizontal(classes="button-row"):
+                            yield Button("Train", id="train-dl", variant="success")
+                    with TabPane("Run", id="dl-run-pane"):
+                        yield Label("Model (PT file)")
+                        yield DLModelTree(project_folder, id="dl-run-model")
+                        yield Static("Select a PT file", id="selected-dl-model", markup=False)
+
+                        yield Label("Smooth movement (off = simple)")
+                        yield Switch(value=False, id="dl-smooth")
+
+                        yield Label("Timesteps")
+                        yield Input(value="1000", type="integer", id="dl-timesteps")
+
+                        with Horizontal(classes="button-row"):
+                            yield Button("Run", id="run-dl", variant="success")
             with TabPane("Logs"):
                 yield RichLog(id="output", markup=False, wrap=True, max_lines=2000)
             with TabPane("Training-Data"):
                 yield Static("Kills: 0", id="kills")
                 yield Static("Avg Kill Time: 0.00s", id="killtimes")
+            with TabPane("create_data", id="view-pane-data"):
+                yield FileTree(folder, id="Files-data")
+                yield Static("Select a ZIP file", id="selected-data", markup=False)
+
+                yield Label("Smooth movement (off = simple)")
+                yield Switch(value=False, id="smooth-data")
+
+                yield Label("Timesteps")
+                yield Input(value="1000", type="integer", id="timesteps-data")
+
+                yield Label("Data Folder")
+                yield Input(value="data/Run1", id="data-dir")
+
+                with Horizontal(classes="button-row"):
+                    yield Button("Run", id="run-data", variant="success")
                 
         yield Static("Idle", id="status")
         yield ProgressBar(total=100, show_eta=False, id="progress")
@@ -198,11 +295,67 @@ class SharpshootTUI(App):
 
     #Runs on button press, currently hooked into train and run buttons.
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "train-dl":
+            dataset = getattr(self, "selected_dl_dataset", None)
+            model_folder = self.query_one("#dl-train-model", Input).value.strip()
+            try:
+                epochs = int(self.query_one("#dl-epochs", Input).value)
+                if not 1 <= epochs <= 10_000:
+                    raise ValueError
+            except ValueError:
+                self.query_one("#status", Static).update("Epochs must be between 1 and 10,000")
+                return
+            if dataset is None or not dataset.is_file() or dataset.suffix.lower() != ".csv" or not model_folder:
+                self.query_one("#status", Static).update("Select a CSV file and enter a model folder")
+                return
+
+            self.launch_dl_training(dataset, Path(model_folder), epochs)
+
+        if event.button.id == "run-dl":
+            model_path = getattr(self, "selected_dl_model", None)
+            smooth = self.query_one("#dl-smooth", Switch).value
+            movement_type = "smooth" if smooth else "simple"
+            try:
+                timesteps = int(self.query_one("#dl-timesteps", Input).value)
+                if timesteps < 1:
+                    raise ValueError
+            except ValueError:
+                self.query_one("#status", Static).update("Timesteps must be at least 1")
+                return
+            if model_path is None or not model_path.is_file() or model_path.suffix.lower() != ".pt":
+                self.query_one("#status", Static).update("Select a PT model file")
+                return
+
+            self.launch_dl_playback(model_path, timesteps, movement_type)
+
+        if event.button.id == "run-data":
+            selected_path = Path(getattr(self, "selected_data_path", None))
+            smooth = self.query_one("#smooth-data", Switch).value
+            movement_type = "smooth" if smooth else "simple"
+            try:
+                timesteps = int(self.query_one("#timesteps-data", Input).value)
+                if timesteps < 1:
+                    raise ValueError
+            except ValueError:
+                self.query_one("#status", Static).update("Timesteps must be at least 1")
+                return
+            dataDir = self.query_one("#data-dir", Input).value
+            data_dir = Path(dataDir)
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            self.launch_create_data(selected_path, movement_type, timesteps, data_dir)
+
         if event.button.id == "run":
             selected_path = getattr(self, "selected_path", None)
             smooth = self.query_one("#smooth", Switch).value
             movement_type = "smooth" if smooth else "simple"
-            timesteps = int(self.query_one("#timesteps", Input).value)
+            try:
+                timesteps = int(self.query_one("#timesteps", Input).value)
+                if timesteps < 1:
+                    raise ValueError
+            except ValueError:
+                self.query_one("#status", Static).update("Timesteps must be at least 1")
+                return
 
             self.query_one("#status", Static).update(
                 "Running model_viewer (May take a few moments to appear)"
@@ -214,8 +367,14 @@ class SharpshootTUI(App):
             model_path = Path("models/" + self.query_one("#model_name", Input).value)
             smooth = self.query_one("#train_smooth", Switch).value
             movement_type = "smooth" if smooth else "simple"
-            timesteps = int(self.query_one("#train_timesteps", Input).value)
-            checkpoints = int(self.query_one("#train_checkpoints", Input).value)
+            try:
+                timesteps = int(self.query_one("#train_timesteps", Input).value)
+                checkpoints = int(self.query_one("#train_checkpoints", Input).value)
+                if timesteps < 1 or checkpoints < 1:
+                    raise ValueError
+            except ValueError:
+                self.query_one("#status", Static).update("Timesteps and Checkpoints must be at least 1")
+                return
 
             self.query_one("#status", Static).update(
                 "Running training (May take a few moments for progress to start updating)"
@@ -418,6 +577,277 @@ class SharpshootTUI(App):
             output_queue.close()
             button.disabled = False
 
+    @work
+    async def launch_create_data(self, model_path, movement_type, timesteps, data_dir):
+        completion = Value("d", 0.0)
+        output_queue = Queue()
+
+        progress = self.query_one("#progress", ProgressBar)
+        status = self.query_one("#status", Static)
+        log = self.query_one("#output", RichLog)
+        button = self.query_one("#run-data", Button)
+
+        progress.update(total=100, progress=0)
+        button.disabled = True
+        status.update("Starting playback...")
+
+        process = Process(
+            target=data_with_output,
+            args=(
+                output_queue,
+                model_path,
+                movement_type,
+                timesteps,
+                data_dir,
+                completion
+            ),
+        )
+
+        pending = ""
+        started = False
+
+        try:
+            process.start()
+            started = True
+
+            while True:
+                # Check before draining so the final batch is also collected.
+                finished = not process.is_alive()
+                queue_empty = False
+
+                for _ in range(100):
+                    try:
+                        text = output_queue.get_nowait()
+                    except Empty:
+                        queue_empty = True
+                        break
+
+                    if text is None:
+                        continue
+
+                    pending += text
+
+                    while "\n" in pending:
+                        line, pending = pending.split("\n", 1)
+                        log.write(line.rstrip("\r"))
+
+                progress.update(progress=completion.value)
+
+                if finished and queue_empty:
+                    break
+
+                await asyncio.sleep(0.1)
+
+            process.join()
+
+            if process.exitcode == 0:
+                status.update("Data creation finished")
+            else:
+                status.update(f"Data creation failed: exit code {process.exitcode}")
+
+        except asyncio.CancelledError:
+            status.update("Data creation cancelled")
+            raise
+
+        except Exception as error:
+            status.update("Data creation failed")
+            log.write(str(error))
+
+        finally:
+            if pending:
+                log.write(pending)
+
+            if started:
+                if process.is_alive():
+                    process.terminate()
+
+                # Wait without blocking Textual's event loop.
+                await asyncio.to_thread(process.join)
+                process.close()
+
+            output_queue.close()
+            button.disabled = False
+
+    @work
+    async def launch_dl_training(self, dataset, model_folder, epochs):
+        completion = Value("d", 0.0)
+        output_queue = Queue()
+
+        progress = self.query_one("#progress", ProgressBar)
+        status = self.query_one("#status", Static)
+        log = self.query_one("#output", RichLog)
+        button = self.query_one("#train-dl", Button)
+
+        progress.update(total=100, progress=0)
+        button.disabled = True
+        status.update("Starting DL training...")
+
+        process = Process(
+            target=dl_train_with_output,
+            args=(
+                output_queue,
+                dataset,
+                model_folder,
+                epochs,
+                completion
+            ),
+        )
+
+        pending = ""
+        started = False
+
+        try:
+            process.start()
+            started = True
+
+            while True:
+                # Check before draining so the final batch is also collected.
+                finished = not process.is_alive()
+                queue_empty = False
+
+                for _ in range(100):
+                    try:
+                        text = output_queue.get_nowait()
+                    except Empty:
+                        queue_empty = True
+                        break
+
+                    if text is None:
+                        continue
+
+                    pending += text
+
+                    while "\n" in pending:
+                        line, pending = pending.split("\n", 1)
+                        log.write(line.rstrip("\r"))
+
+                progress.update(progress=completion.value * 100)
+
+                if finished and queue_empty:
+                    break
+
+                await asyncio.sleep(0.1)
+
+            process.join()
+
+            if process.exitcode == 0:
+                status.update("DL training finished")
+            else:
+                status.update(f"DL training failed: exit code {process.exitcode}")
+
+        except asyncio.CancelledError:
+            status.update("DL training cancelled")
+            raise
+
+        except Exception as error:
+            status.update("DL training failed")
+            log.write(str(error))
+
+        finally:
+            if pending:
+                log.write(pending)
+
+            if started:
+                if process.is_alive():
+                    process.terminate()
+
+                # Wait without blocking Textual's event loop.
+                await asyncio.to_thread(process.join)
+                process.close()
+
+            output_queue.close()
+            button.disabled = False
+
+    @work
+    async def launch_dl_playback(self, model_path, timesteps, movement_type):
+        completion = Value("d", 0.0)
+        output_queue = Queue()
+
+        progress = self.query_one("#progress", ProgressBar)
+        status = self.query_one("#status", Static)
+        log = self.query_one("#output", RichLog)
+        button = self.query_one("#run-dl", Button)
+
+        progress.update(total=100, progress=0)
+        button.disabled = True
+        status.update("Starting DL playback...")
+
+        process = Process(
+            target=dl_run_with_output,
+            args=(
+                output_queue,
+                model_path,
+                timesteps,
+                movement_type,
+                completion
+            ),
+        )
+
+        pending = ""
+        started = False
+
+        try:
+            process.start()
+            started = True
+
+            while True:
+                # Check before draining so the final batch is also collected.
+                finished = not process.is_alive()
+                queue_empty = False
+
+                for _ in range(100):
+                    try:
+                        text = output_queue.get_nowait()
+                    except Empty:
+                        queue_empty = True
+                        break
+
+                    if text is None:
+                        continue
+
+                    pending += text
+
+                    while "\n" in pending:
+                        line, pending = pending.split("\n", 1)
+                        log.write(line.rstrip("\r"))
+
+                progress.update(progress=completion.value * 100)
+
+                if finished and queue_empty:
+                    break
+
+                await asyncio.sleep(0.1)
+
+            process.join()
+
+            if process.exitcode == 0:
+                status.update("DL playback finished")
+            else:
+                status.update(f"DL playback failed: exit code {process.exitcode}")
+
+        except asyncio.CancelledError:
+            status.update("DL playback cancelled")
+            raise
+
+        except Exception as error:
+            status.update("DL playback failed")
+            log.write(str(error))
+
+        finally:
+            if pending:
+                log.write(pending)
+
+            if started:
+                if process.is_alive():
+                    process.terminate()
+
+                # Wait without blocking Textual's event loop.
+                await asyncio.to_thread(process.join)
+                process.close()
+
+            output_queue.close()
+            button.disabled = False
+
     '''
     When you open the view pane, it runs this which reloads our file explorer.
     '''
@@ -425,15 +855,47 @@ class SharpshootTUI(App):
     def refresh_model_files(self):
         self.query_one("#Files", DirectoryTree).reload()
 
+    @on(TabbedContent.TabActivated, pane="#view-pane-data")
+    def refresh_model_files_data(self):
+        self.query_one("#Files-data", DirectoryTree).reload()
+
+    @on(TabbedContent.TabActivated, pane="#dl-pane")
+    @on(TabbedContent.TabActivated, pane="#dl-train-pane")
+    def refresh_dl_dataset_files(self):
+        self.query_one("#dl-dataset", DirectoryTree).reload()
+
+    @on(TabbedContent.TabActivated, pane="#dl-pane")
+    @on(TabbedContent.TabActivated, pane="#dl-run-pane")
+    def refresh_dl_model_files(self):
+        self.query_one("#dl-run-model", DirectoryTree).reload()
+
     '''
     When a file is selected it sets the path variable and updates text
     '''
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected):
-        self.selected_path = event.path
+        if event.control.id == "Files":
+            self.selected_path = event.path
+            self.query_one("#selected", Static).update(
+                f"Selected: {event.path}"
+            )
 
-        self.query_one("#selected", Static).update(
-            f"Selected: {self.selected_path}"
-        )
+        elif event.control.id == "Files-data":
+            self.selected_data_path = event.path
+            self.query_one("#selected-data", Static).update(
+                f"Selected: {event.path}"
+            )
+
+        elif event.control.id == "dl-dataset":
+            self.selected_dl_dataset = event.path
+            self.query_one("#selected-dl-dataset", Static).update(
+                f"Selected: {event.path}"
+            )
+
+        elif event.control.id == "dl-run-model":
+            self.selected_dl_model = event.path
+            self.query_one("#selected-dl-model", Static).update(
+                f"Selected: {event.path}"
+            )
 
     '''
     When opened it changes the theme to rose-pine-moon as the default theme 

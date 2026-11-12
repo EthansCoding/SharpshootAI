@@ -9,14 +9,30 @@ This class allows the aim_trainer game to be used as an environment for training
 '''
 class AimTrainerEnv(gym.Env):
     '''
+    MODEL REWARD CONSTANTS!!!
+    THESE ARE SUPER IMPORTANT
+    MESS THESE UP AND YOU WILL BREAK REWARDS AND IT WILL TRAIN
+    LOBOTOMIZED MODELS FOR WEEKS.
+    '''
+    REWARD_FOR_KILL = 15
+    REWARD_FOR_MISS = -3
+    REPEATED_MISS_MULTIPLER = .5 #default is 1 e.g for miss = -3, -6, -9, -12
+    REPEATED_MISS_CAP = -9
+    REWARD_MULTIPLIER_FOR_MOVEMENT = 4.0
+
+
+    '''
     The init for the AimTrainerEnv class. It initializes the environment with the specified render mode and movement type.
     render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
     movement_type: str - The type of movement for the agent. It can be "simple" or "smooth". "simple" uses discrete actions, while "smooth" uses continuous actions.
     '''
-    def __init__(self, render_mode=None, movement_type="simple", data=[0, 0]):
+    def __init__(self, render_mode=None, movement_type="simple", data=[0, 0], isTraining=None):
         super().__init__()
+        self.missCount = 0
         self.data = data
         self.movement_type = movement_type
+        self.isTraining = isTraining
+        self.stepCount = 0
         if self.movement_type == "simple":
             self.action_space = spaces.Discrete(5)  # 0: No action, 1: Move left, 2: Move right, 3: Move up, 4: Move down
         if self.movement_type == "smooth":
@@ -35,7 +51,7 @@ class AimTrainerEnv(gym.Env):
     '''
     def reset(self, seed=None, options=None):
         self.aim_trainer_instance.reset()
-
+        self.missCount = 0
         return np.zeros(4, dtype=np.float32), {}
     
     '''
@@ -69,11 +85,18 @@ class AimTrainerEnv(gym.Env):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = 0
         if action != 4:
-            reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
+            reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
+            (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
-            reward += 3
+            self.missCount = 0
+            if self.isTraining is not None:
+                self.stepCount = 0
+            reward += self.REWARD_FOR_KILL
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 2
+            self.missCount += 1
+            loss = self.REWARD_FOR_MISS * (self.missCount * self.REPEATED_MISS_MULTIPLER)
+            if loss < self.REPEATED_MISS_CAP: loss = -15
+            reward += loss
         return reward
 
     '''
@@ -81,11 +104,18 @@ class AimTrainerEnv(gym.Env):
     '''
     def smoothReward(self, action, angles, beforeDMG):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
-        reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
+        reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
+            (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
-            reward += 3
-        if action[2] >= 0 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 2
+            self.missCount = 0
+            if self.isTraining is not None:
+                self.stepCount = 0
+            reward += self.REWARD_FOR_KILL
+        if action[2] >= .5 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
+            self.missCount +=1
+            loss = self.REWARD_FOR_MISS * (self.missCount * self.REPEATED_MISS_MULTIPLER)
+            if loss < self.REPEATED_MISS_CAP: loss = -15
+            reward += loss
         return reward
 
     '''
@@ -122,6 +152,12 @@ class AimTrainerEnv(gym.Env):
         terminated = False
         truncated = False
         info = {}
+
+        if self.isTraining is not None:
+            self.stepCount += 1
+            if self.stepCount > 1000:
+                self.stepCount = 0
+                observation, _ = self.reset()
 
         return (observation, reward, terminated, truncated, info)
 
