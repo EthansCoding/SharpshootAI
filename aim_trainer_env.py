@@ -9,6 +9,17 @@ This class allows the aim_trainer game to be used as an environment for training
 '''
 class AimTrainerEnv(gym.Env):
     '''
+    MODEL REWARD CONSTANTS!!!
+    THESE ARE SUPER IMPORTANT
+    MESS THESE UP AND YOU WILL BREAK REWARDS AND IT WILL TRAIN
+    LOBOTOMIZED MODELS FOR WEEKS.
+    '''
+    REWARD_FOR_KILL = 15
+    REWARD_FOR_MISS = -3
+    REWARD_MULTIPLIER_FOR_MOVEMENT = 4.0
+
+
+    '''
     The init for the AimTrainerEnv class. It initializes the environment with the specified render mode and movement type.
     render_mode: str - The mode of the game. It can be "human", "playback" or None. If it is None, the game will be created in logic only mode.
     movement_type: str - The type of movement for the agent. It can be "simple" or "smooth". "simple" uses discrete actions, while "smooth" uses continuous actions.
@@ -71,13 +82,14 @@ class AimTrainerEnv(gym.Env):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
         reward = 0
         if action != 4:
-            reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
+            reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
+            (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             if self.isTraining is not None:
                 self.stepCount = 0
-            reward += 20
+            reward += self.REWARD_FOR_KILL
         if action == 4 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 1
+            reward += self.REWARD_FOR_MISS
         return reward
 
     '''
@@ -85,13 +97,14 @@ class AimTrainerEnv(gym.Env):
     '''
     def smoothReward(self, action, angles, beforeDMG):
         beforeXY, beforeZX, thetaXY, thetaZX = angles[0], angles[1], angles[2], angles[3]
-        reward = (abs(beforeXY) - abs(thetaXY)) * 4 + (abs(beforeZX) - abs(thetaZX)) * 4
+        reward = (abs(beforeXY) - abs(thetaXY)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT + \
+            (abs(beforeZX) - abs(thetaZX)) * self.REWARD_MULTIPLIER_FOR_MOVEMENT
         if beforeDMG != self.aim_trainer_instance.Enemies[0].health:
             if self.isTraining is not None:
                 self.stepCount = 0
-            reward += 20
+            reward += self.REWARD_FOR_KILL
         if action[2] >= .5 and beforeDMG == self.aim_trainer_instance.Enemies[0].health:
-            reward -= 1
+            reward += self.REWARD_FOR_MISS
         return reward
 
     '''

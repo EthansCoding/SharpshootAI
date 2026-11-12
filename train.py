@@ -17,6 +17,12 @@ def Train(model_path, movement_type, save_checkpoints, timesteps, completion=Non
     timesteps_per_checkpoint = save_checkpoints
     total_timesteps = 0
 
+    def update_completion(local_vars, global_vars):
+        if completion is not None:
+            steps = total_timesteps + local_vars["self"].num_timesteps
+            completion.value = min(steps / timesteps, 1.0)
+        return True  # Keep training
+
     if completion is not None:
         completion.value = total_timesteps / timesteps
 
@@ -24,11 +30,10 @@ def Train(model_path, movement_type, save_checkpoints, timesteps, completion=Non
     while total_timesteps < timesteps:
         model.learn(
             total_timesteps = timesteps_per_checkpoint,
-            progress_bar = True
+            progress_bar = True,
+            callback = update_completion
         )
         total_timesteps += timesteps_per_checkpoint
-        if completion is not None:
-            completion.value = total_timesteps / timesteps
         model_name = f"model_{total_timesteps // 1000}k"
         model.save(models_dir / model_name)
 

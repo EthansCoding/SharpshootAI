@@ -20,7 +20,7 @@ class Classifier(nn.Module):
     def forward(self, x):
         return self.net(x)  # Raw class scores (logits)
 
-def train(dataset, saveFolder, epochs):
+def train(dataset, saveFolder, epochs, completion=None):
     model = Classifier()
     loss_fn = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
@@ -40,12 +40,15 @@ def train(dataset, saveFolder, epochs):
         loss.backward()
         optimizer.step()
 
+        if completion is not None:
+            completion.value = (epoch + 1) / epochs
+
     folder = Path(saveFolder)
     folder.mkdir(parents=True, exist_ok=True)
 
     torch.save(model.state_dict(), folder / "model.pt")
 
-def run(modelFolder, time, movement_type="simple"):
+def run(modelFolder, time, movement_type="simple", completion=None):
     from aim_trainer_env import AimTrainerEnv
 
     folder = Path(modelFolder)
@@ -59,12 +62,15 @@ def run(modelFolder, time, movement_type="simple"):
 
     obs,_ = game.reset()
     with torch.no_grad():
-        for _ in range(time):
+        for step in range(time):
             np_obs = np.array(obs, dtype=np.float32)
             new_input = torch.as_tensor(np_obs).unsqueeze(0)
             action = model(new_input).argmax(dim=1).item()
 
             obs, reward, terminated, truncated, info = game.step(action=action)
+
+            if completion is not None:
+                completion.value = (step + 1) / time
 
 
 
