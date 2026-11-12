@@ -51,10 +51,12 @@ def train(dataset, saveFolder, epochs, completion=None):
 def run(modelFolder, time, movement_type="simple", completion=None):
     from aim_trainer_env import AimTrainerEnv
 
-    folder = Path(modelFolder)
+    model_path = Path(modelFolder)
+    if model_path.is_dir():
+        model_path = model_path / "model.pt"
     model = Classifier()
     model.load_state_dict(
-        torch.load(folder / "model.pt", weights_only=True)
+        torch.load(model_path, weights_only=True)
     )
     model.eval()
 

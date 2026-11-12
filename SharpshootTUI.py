@@ -26,12 +26,20 @@ from textual.widgets import (
 Textual class item that draws a directory with all paths and .zip files.
 '''
 class FileTree(DirectoryTree):
+    extension = ".zip"
+
     def filter_paths(self, paths: Iterable[Path]):
         return [
             path
             for path in paths
-            if path.is_dir() or path.suffix.lower() == ".zip"
+            if path.is_dir() or path.suffix.lower() == self.extension
         ]
+
+class DatasetTree(FileTree):
+    extension = ".csv"
+
+class DLModelTree(FileTree):
+    extension = ".pt"
 
 '''
 QueueOutput creates a queue of the logs from the programs we run from this TUI
@@ -200,7 +208,8 @@ class SharpshootTUI(App):
     in the app
     '''
     def compose(self) -> ComposeResult:
-        folder = Path(__file__).resolve().parent / "models"
+        project_folder = Path(__file__).resolve().parent
+        folder = project_folder / "models"
         yield Header()
 
         with TabbedContent():
@@ -235,7 +244,8 @@ class SharpshootTUI(App):
                 with TabbedContent():
                     with TabPane("Train", id="dl-train-pane"):
                         yield Label("Dataset (CSV file)")
-                        yield Input(placeholder="Path to dataset CSV", id="dl-dataset")
+                        yield DatasetTree(project_folder, id="dl-dataset")
+                        yield Static("Select a CSV file", id="selected-dl-dataset", markup=False)
 
                         yield Label("Model Folder")
                         yield Input(value="DLmodels/DLmodel", id="dl-train-model")
@@ -246,8 +256,9 @@ class SharpshootTUI(App):
                         with Horizontal(classes="button-row"):
                             yield Button("Train", id="train-dl", variant="success")
                     with TabPane("Run", id="dl-run-pane"):
-                        yield Label("Model Folder (contains model.pt)")
-                        yield Input(value="DLmodels/DLmodel", id="dl-run-model")
+                        yield Label("Model (PT file)")
+                        yield DLModelTree(project_folder, id="dl-run-model")
+                        yield Static("Select a PT file", id="selected-dl-model", markup=False)
 
                         yield Label("Smooth movement (off = simple)")
                         yield Switch(value=False, id="dl-smooth")
@@ -285,7 +296,7 @@ class SharpshootTUI(App):
     #Runs on button press, currently hooked into train and run buttons.
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "train-dl":
-            dataset = Path(self.query_one("#dl-dataset", Input).value)
+            dataset = getattr(self, "selected_dl_dataset", None)
             model_folder = self.query_one("#dl-train-model", Input).value.strip()
             try:
                 epochs = int(self.query_one("#dl-epochs", Input).value)
@@ -294,14 +305,14 @@ class SharpshootTUI(App):
             except ValueError:
                 self.query_one("#status", Static).update("Epochs must be between 1 and 10,000")
                 return
-            if not dataset.is_file() or not model_folder:
-                self.query_one("#status", Static).update("Enter a dataset file and model folder")
+            if dataset is None or not dataset.is_file() or dataset.suffix.lower() != ".csv" or not model_folder:
+                self.query_one("#status", Static).update("Select a CSV file and enter a model folder")
                 return
 
             self.launch_dl_training(dataset, Path(model_folder), epochs)
 
         if event.button.id == "run-dl":
-            model_folder = Path(self.query_one("#dl-run-model", Input).value)
+            model_path = getattr(self, "selected_dl_model", None)
             smooth = self.query_one("#dl-smooth", Switch).value
             movement_type = "smooth" if smooth else "simple"
             try:
@@ -311,11 +322,11 @@ class SharpshootTUI(App):
             except ValueError:
                 self.query_one("#status", Static).update("Timesteps must be at least 1")
                 return
-            if not (model_folder / "model.pt").is_file():
-                self.query_one("#status", Static).update("Select a model folder containing model.pt")
+            if model_path is None or not model_path.is_file() or model_path.suffix.lower() != ".pt":
+                self.query_one("#status", Static).update("Select a PT model file")
                 return
 
-            self.launch_dl_playback(model_folder, timesteps, movement_type)
+            self.launch_dl_playback(model_path, timesteps, movement_type)
 
         if event.button.id == "run-data":
             selected_path = Path(getattr(self, "selected_data_path", None))
@@ -748,7 +759,7 @@ class SharpshootTUI(App):
             button.disabled = False
 
     @work
-    async def launch_dl_playback(self, model_folder, timesteps, movement_type):
+    async def launch_dl_playback(self, model_path, timesteps, movement_type):
         completion = Value("d", 0.0)
         output_queue = Queue()
 
@@ -765,7 +776,7 @@ class SharpshootTUI(App):
             target=dl_run_with_output,
             args=(
                 output_queue,
-                model_folder,
+                model_path,
                 timesteps,
                 movement_type,
                 completion
@@ -848,6 +859,16 @@ class SharpshootTUI(App):
     def refresh_model_files_data(self):
         self.query_one("#Files-data", DirectoryTree).reload()
 
+    @on(TabbedContent.TabActivated, pane="#dl-pane")
+    @on(TabbedContent.TabActivated, pane="#dl-train-pane")
+    def refresh_dl_dataset_files(self):
+        self.query_one("#dl-dataset", DirectoryTree).reload()
+
+    @on(TabbedContent.TabActivated, pane="#dl-pane")
+    @on(TabbedContent.TabActivated, pane="#dl-run-pane")
+    def refresh_dl_model_files(self):
+        self.query_one("#dl-run-model", DirectoryTree).reload()
+
     '''
     When a file is selected it sets the path variable and updates text
     '''
@@ -861,6 +882,18 @@ class SharpshootTUI(App):
         elif event.control.id == "Files-data":
             self.selected_data_path = event.path
             self.query_one("#selected-data", Static).update(
+                f"Selected: {event.path}"
+            )
+
+        elif event.control.id == "dl-dataset":
+            self.selected_dl_dataset = event.path
+            self.query_one("#selected-dl-dataset", Static).update(
+                f"Selected: {event.path}"
+            )
+
+        elif event.control.id == "dl-run-model":
+            self.selected_dl_model = event.path
+            self.query_one("#selected-dl-model", Static).update(
                 f"Selected: {event.path}"
             )
 
