@@ -56,7 +56,7 @@ def main():
     if config_valid:
         get_data(modelPath, args.movement_type, args.time, data_dir)
 
-def get_data(modelPath, movement_type, time, data_dir):
+def get_data(modelPath, movement_type, time, data_dir, completion=None):
     config_valid = True
     try:
         model = PPO.load(modelPath, env=AimTrainerEnv(render_mode=None, movement_type=movement_type))
@@ -69,7 +69,8 @@ def get_data(modelPath, movement_type, time, data_dir):
     if config_valid:
         obs = model.env.reset()
 
-        count = 0
+        if completion is not None:
+            completion.value = 0
         '''
         Step through for all of the time steps and play it back for the user.
         '''
@@ -83,6 +84,9 @@ def get_data(modelPath, movement_type, time, data_dir):
 
                 row = obs.flatten().tolist() + action.flatten().tolist()
                 writer.writerow(row)
+
+                if completion is not None:
+                    completion.value += 1 / time * 100
 
                 obs, reward, terminated, truncated = model.env.step(action)
             model.env.close()

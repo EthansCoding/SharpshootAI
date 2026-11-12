@@ -66,6 +66,21 @@ def playback_with_output(queue, *args):
         finally:
             queue.put(None)
 
+def data_with_output(queue, *args):
+    import traceback
+
+    output = QueueOutput(queue)
+
+    with redirect_stdout(output), redirect_stderr(output):
+        try:
+            from create_data import get_data
+            get_data(*args)
+        except Exception:
+            traceback.print_exc()
+            raise
+        finally:
+            queue.put(None)
+
 '''
 This runs the training without output in the TUI, instead sent to a richlog.
 '''
@@ -191,6 +206,21 @@ class SharpshootTUI(App):
             with TabPane("Training-Data"):
                 yield Static("Kills: 0", id="kills")
                 yield Static("Avg Kill Time: 0.00s", id="killtimes")
+            with TabPane("create_data", id="view-pane-data"):
+                yield FileTree(folder, id="Files-data")
+                yield Static("Select a ZIP file", id="selected-data", markup=False)
+
+                yield Label("Smooth movement (off = simple)")
+                yield Switch(value=False, id="smooth-data")
+
+                yield Label("Timesteps")
+                yield Input(value="1000", type="integer", id="timesteps-data")
+
+                yield Label("Data Folder")
+                yield Input(value="data/Run1", id="data-dir")
+
+                with Horizontal(classes="button-row"):
+                    yield Button("Run", id="run-data", variant="success")
                 
         yield Static("Idle", id="status")
         yield ProgressBar(total=100, show_eta=False, id="progress")
@@ -198,6 +228,17 @@ class SharpshootTUI(App):
 
     #Runs on button press, currently hooked into train and run buttons.
     def on_button_pressed(self, event: Button.Pressed):
+        if event.button.id == "run-data":
+            selected_path = Path(getattr(self, "selected_data_path", None))
+            smooth = self.query_one("#smooth-data", Switch).value
+            movement_type = "smooth" if smooth else "simple"
+            timesteps = int(self.query_one("#timesteps-data", Input).value)
+            dataDir = self.query_one("#data-dir", Input).value
+            data_dir = Path(dataDir)
+            data_dir.mkdir(parents=True, exist_ok=True)
+
+            self.launch_create_data(selected_path, movement_type, timesteps, data_dir)
+
         if event.button.id == "run":
             selected_path = getattr(self, "selected_path", None)
             smooth = self.query_one("#smooth", Switch).value
@@ -418,6 +459,97 @@ class SharpshootTUI(App):
             output_queue.close()
             button.disabled = False
 
+    @work
+    async def launch_create_data(self, model_path, movement_type, timesteps, data_dir):
+        completion = Value("d", 0.0)
+        output_queue = Queue()
+
+        progress = self.query_one("#progress", ProgressBar)
+        status = self.query_one("#status", Static)
+        log = self.query_one("#output", RichLog)
+        button = self.query_one("#run-data", Button)
+
+        progress.update(total=100, progress=0)
+        button.disabled = True
+        status.update("Starting playback...")
+
+        process = Process(
+            target=data_with_output,
+            args=(
+                output_queue,
+                model_path,
+                movement_type,
+                timesteps,
+                data_dir,
+                completion
+            ),
+        )
+
+        pending = ""
+        started = False
+
+        try:
+            process.start()
+            started = True
+
+            while True:
+                # Check before draining so the final batch is also collected.
+                finished = not process.is_alive()
+                queue_empty = False
+
+                for _ in range(100):
+                    try:
+                        text = output_queue.get_nowait()
+                    except Empty:
+                        queue_empty = True
+                        break
+
+                    if text is None:
+                        continue
+
+                    pending += text
+
+                    while "\n" in pending:
+                        line, pending = pending.split("\n", 1)
+                        log.write(line.rstrip("\r"))
+
+                progress.update(progress=completion.value)
+
+                if finished and queue_empty:
+                    break
+
+                await asyncio.sleep(0.1)
+
+            process.join()
+
+            if process.exitcode == 0:
+                status.update("Playback finished")
+            else:
+                status.update(f"Playback failed: exit code {process.exitcode}")
+
+        except asyncio.CancelledError:
+            status.update("Playback cancelled")
+            raise
+
+        except Exception as error:
+            status.update("Playback failed")
+            log.write(str(error))
+
+        finally:
+            if pending:
+                log.write(pending)
+
+            if started:
+                if process.is_alive():
+                    process.terminate()
+
+                # Wait without blocking Textual's event loop.
+                await asyncio.to_thread(process.join)
+                process.close()
+
+            output_queue.close()
+            button.disabled = False
+
     '''
     When you open the view pane, it runs this which reloads our file explorer.
     '''
@@ -425,15 +557,25 @@ class SharpshootTUI(App):
     def refresh_model_files(self):
         self.query_one("#Files", DirectoryTree).reload()
 
+    @on(TabbedContent.TabActivated, pane="#view-pane-data")
+    def refresh_model_files(self):
+        self.query_one("#Files-data", DirectoryTree).reload()
+
     '''
     When a file is selected it sets the path variable and updates text
     '''
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected):
-        self.selected_path = event.path
+        if event.control.id == "Files":
+            self.selected_path = event.path
+            self.query_one("#selected", Static).update(
+                f"Selected: {event.path}"
+            )
 
-        self.query_one("#selected", Static).update(
-            f"Selected: {self.selected_path}"
-        )
+        elif event.control.id == "Files-data":
+            self.selected_data_path = event.path
+            self.query_one("#selected-data", Static).update(
+                f"Selected: {event.path}"
+            )
 
     '''
     When opened it changes the theme to rose-pine-moon as the default theme 
