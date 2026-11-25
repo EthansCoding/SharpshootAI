@@ -913,4 +913,10 @@ class SharpshootTUI(App):
         self.theme = self.DEFAULT_THEME
 
 if __name__ == "__main__":
+    import sys
+
+    if sys.platfrom != "win32":
+        from multiprocessing import resource_tracker
+        resource_tracker.ensure_running()
+
     SharpshootTUI().run()
