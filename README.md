@@ -82,6 +82,12 @@
 
 SharpshootAI is the leading answer to being bad at video games. By leveraging state of the art python importing skills I have created the leading way to cheat in video games. If you simple feed this model that you train yourself the angle to the enemy it will lock on and start blasting away.
 
+
+<details>
+<summary>Demo Walkthrough</summary>
+https://www.youtube.com/watch?v=j8QJ4m1VXdI
+</details>
+
 <details>
 <summary>Images</summary>
 
