@@ -225,7 +225,8 @@ Training Path for successful DL run:
 
 - [X] Functioning MVP
 - [X] Terminal UI
-- [ ] Addings Guns and polish game viewing.
+- [X] DL implementation
+- [X] Addings Guns and polish game viewing.
 - [ ] Model leader board within TUI
 
 See the [open issues](https://github.com/EthansCoding/SharpshootAI/issues) for a full list of proposed features (and known issues).

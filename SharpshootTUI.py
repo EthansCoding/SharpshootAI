@@ -74,6 +74,9 @@ def playback_with_output(queue, *args):
         finally:
             queue.put(None)
 
+'''
+This runs the data creation function without output in the TUI and instead sent to the queue
+'''
 def data_with_output(queue, *args):
     import traceback
 
@@ -107,6 +110,9 @@ def train_with_output(queue, *args):
         finally:
             queue.put(None)
 
+'''
+This runs the training without output in the TUI, instead sending to a queue.
+'''
 def dl_train_with_output(queue, *args):
     import traceback
 
@@ -122,6 +128,9 @@ def dl_train_with_output(queue, *args):
         finally:
             queue.put(None)
 
+'''
+This runs the DL run without output in the TUI instead sent to the queue
+'''
 def dl_run_with_output(queue, *args):
     import traceback
 
