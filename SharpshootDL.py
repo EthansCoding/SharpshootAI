@@ -6,6 +6,12 @@ import pandas as pd
 from pathlib import Path
 import pretty_output
 
+'''
+This is my very own model architecture for this project.
+Its built on the neural net module from torch,
+it has 5 layers going from 4 continuos inputs to 5
+continuous probabilities of 5 actions.
+'''
 class Classifier(nn.Module):
     def __init__(self):
         super().__init__()
@@ -20,6 +26,13 @@ class Classifier(nn.Module):
     def forward(self, x):
         return self.net(x)  # Raw class scores (logits)
 
+'''
+This is the function for training the model,
+it loads in the data and does some warming up torch commands
+then for a certain number of epochs it trains the model
+using cross entropy loss to back propogate model weight changes
+and step through the optimizer gradient.
+'''
 def train(dataset, saveFolder, epochs, completion=None):
     model = Classifier()
     loss_fn = nn.CrossEntropyLoss()
@@ -48,6 +61,12 @@ def train(dataset, saveFolder, epochs, completion=None):
 
     torch.save(model.state_dict(), folder / "model.pt")
 
+'''
+This function runs the model,
+starting with loading the model it then gives the model
+the inputs, takes the highest probability output
+and runs one frame of the game with that input.
+'''
 def run(modelFolder, time, movement_type="simple", completion=None):
     from aim_trainer_env import AimTrainerEnv
 
@@ -74,8 +93,10 @@ def run(modelFolder, time, movement_type="simple", completion=None):
             if completion is not None:
                 completion.value = (step + 1) / time
 
-
-
+'''
+Function for running from CMD line, it can either train or run the models
+No longer commonly used since the TUI came out.
+'''
 def main():
     #Add the arguments for the command.
     parser = argparse.ArgumentParser(description="Train a RL model for the Aim Trainer environment.")

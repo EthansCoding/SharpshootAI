@@ -5,6 +5,9 @@ from pathlib import Path
 import argparse
 import pretty_output
 
+'''
+Training function to use PPO training to train a model to beat the AimTrainer game.
+'''
 def Train(model_path, movement_type, save_checkpoints, timesteps, completion=None, data=[0,0]):
     models_dir = Path(model_path)
     models_dir.mkdir(parents=True, exist_ok=True)
